@@ -18,10 +18,10 @@
 /[Rr]ecordings/
 
 # Images can get excessive in size
-/Assets/[Oo]versized[Ii]mages/
+/Assets/[Ii]mported[Aa]ssets/
 
 # Allow a .gitkeep file in the "Images" folder to keep the folder itself in Git
-!/Assets/[Oo]versized[Ii]mages/.gitkeep
+!/Assets/[Ii]mported[Aa]ssets/.gitkeep
 
 # Uncomment this line if you wish to ignore the asset store tools plugin
 # /[Aa]ssets/AssetStoreTools*
