@@ -1,112 +1,77 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class BallController : MonoBehaviour
+public class RollABallController : MonoBehaviour
 {
-    public float speed = 10f;
-    public Transform cameraTransform;
-    public float cameraDistance = 5f;
-    public float cameraHeight = 2f;
-    public float mouseSensitivity = 200f;
+    public float moveSpeed = 10f;
     public float jumpForce = 5f;
-    public float movementSmoothness = 0.1f; // Value between 0 and 1 for smoothness
+    public Transform cameraTransform;
+    public float cameraDistance = 10f;
+    public float cameraHeight = 5f;
+    public float cameraSmoothness = 0.1f;
+    public LayerMask wallLayer;
+    public float mouseSensitivity = 2f;
 
     private Rigidbody rb;
-    private float rotationY = 0f;
-    private float rotationX = 0f;
-    private bool isGrounded = true;
-
-    public LayerMask groundLayer;
-    public float groundCheckDistance = 1.1f;
+    private bool isGrounded;
+    private Vector3 cameraVelocity = Vector3.zero;
+    private float cameraRotationX = 0f;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-
-        // Ensure the cameraTransform is set in the Inspector
-        if (cameraTransform == null)
-        {
-            Debug.LogError("Camera Transform is not assigned. Please assign it in the Inspector.");
-        }
-
-        // Lock the cursor for FPS-like control
         Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
     }
 
     void Update()
     {
-        // Handle jump input
-        if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
-        {
-            rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-            isGrounded = false; // Temporarily set false to avoid multiple jumps
-        }
-
-        // Handle mouse input for camera rotation
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
-
-        // Update the rotation values
-        rotationY += mouseX;
-        rotationX -= mouseY;
-        rotationX = Mathf.Clamp(rotationX, -45f, 45f); // Clamp vertical rotation for a comfortable view
-    }
-
-    void FixedUpdate()
-    {
-        // Ground Check using Raycast
-        isGrounded = Physics.Raycast(transform.position, Vector3.down, groundCheckDistance, groundLayer);
-
-        // Get input for both horizontal and vertical (supports WASD and Arrow keys)
+        // WASD movement
         float moveHorizontal = Input.GetAxis("Horizontal");
         float moveVertical = Input.GetAxis("Vertical");
 
-        // Calculate movement relative to camera
-        Vector3 forward = cameraTransform.forward;
-        Vector3 right = cameraTransform.right;
+        Vector3 movement = new Vector3(moveHorizontal, 0.0f, moveVertical);
+        rb.AddForce(movement * moveSpeed);
 
-        // Remove the y-component to keep movement on the XZ plane
-        forward.y = 0f;
-        right.y = 0f;
-        forward.Normalize();
-        right.Normalize();
-
-        // Compute movement vector
-        Vector3 movement = (forward * moveVertical + right * moveHorizontal).normalized * speed;
-
-        // Smooth the transition of velocity
-        Vector3 targetVelocity = new Vector3(movement.x, rb.velocity.y, movement.z);
-        rb.velocity = Vector3.Lerp(rb.velocity, targetVelocity, movementSmoothness);
-
-        // Update camera position to follow the ball directly, without smoothing
-        UpdateCamera();
-    }
-
-    void UpdateCamera()
-    {
-        if (cameraTransform != null)
+        // Jumping
+        if (Input.GetButtonDown("Jump") && isGrounded)
         {
-            // Calculate desired position based on the rotation and set the camera position
-            Quaternion rotation = Quaternion.Euler(rotationX, rotationY, 0);
-            Vector3 desiredPosition = transform.position - (rotation * Vector3.forward * cameraDistance) + Vector3.up * cameraHeight;
+            rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+        }
 
-            // Directly set the camera position for instant response
-            cameraTransform.position = desiredPosition;
+        // Camera Mouse Control
+        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
+        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
 
-            // Make the camera look at the ball
-            cameraTransform.LookAt(transform.position + Vector3.up * 0.5f); // Look at a slightly higher point for better view
+        cameraRotationX -= mouseY;
+        cameraRotationX = Mathf.Clamp(cameraRotationX, -90f, 90f);
+
+        cameraTransform.localRotation = Quaternion.Euler(cameraRotationX, 0f, 0f);
+        transform.Rotate(Vector3.up * mouseX);
+
+        // Camera Follow
+        Vector3 targetPosition = transform.position - cameraTransform.forward * cameraDistance + Vector3.up * cameraHeight;
+        cameraTransform.position = Vector3.SmoothDamp(cameraTransform.position, targetPosition, ref cameraVelocity, cameraSmoothness);
+
+        // Handle camera wall collision
+        RaycastHit hit;
+        if (Physics.Linecast(transform.position, cameraTransform.position, out hit, wallLayer))
+        {
+            cameraTransform.position = hit.point;
         }
     }
 
-    // Check if the ball is grounded using collision detection
-    private void OnCollisionEnter(Collision collision)
+    private void OnCollisionStay(Collision collision)
     {
-        // Check if we have collided with anything on the ground layer
-        if (((1 << collision.gameObject.layer) & groundLayer) != 0)
+        if (collision.gameObject.CompareTag("Ground"))
         {
             isGrounded = true;
+        }
+    }
+
+    private void OnCollisionExit(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("Ground"))
+        {
+            isGrounded = false;
         }
     }
 }
